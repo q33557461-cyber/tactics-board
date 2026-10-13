@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>축구 작전판</title>
+<meta name="description" content="포메이션과 선수 위치를 손으로 옮기고, 화살표로 움직임을 그려 상황별로 저장해 두는 축구 작전판. 폰과 PC에서 바로 씁니다.">
+<meta name="theme-color" content="#14361F">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="작전판">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+:root{
+  --bg:#0F1A13; --panel:#182A1E; --panel-2:#20382A; --line:#2E4A38; --ink:#EEF3EE; --muted:#9DB3A3;
+  --accent:#F2C94C; --accent-ink:#1A1400; --danger:#E5533D;
+  --pitch:#2E7D42; --pitch-2:#2A7340; --chalk:#E8F3E8;
+  --our:#E53935; --opp:#1E88E5;
+  --r:12px; --r-s:8px;
+  --body:"Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+
+.app{display:grid;grid-template-rows:auto 1fr auto;height:100%;max-width:1400px;margin:0 auto;padding:0 env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+@media (min-width:900px){.app{grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:auto 1fr auto}}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+@media (min-width:900px){.top{grid-column:1/3}}
+.top h1{margin:0;font-size:16px;font-weight:900;letter-spacing:-.01em;white-space:nowrap}
+.top h1 small{font-weight:500;color:var(--muted);font-size:12px;margin-left:6px}
+.scene-nav{display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center}
+.scene-nav input{flex:1;min-width:0;max-width:260px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-s);padding:6px 10px;font-weight:700;text-align:center}
+.scene-nav .cnt{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ibtn{width:34px;height:34px;border-radius:var(--r-s);border:1px solid var(--line);background:var(--panel-2);display:inline-grid;place-items:center;cursor:pointer;flex:none;font-size:16px;line-height:1}
+.ibtn:hover{background:#28452f}
+.ibtn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.ibtn:disabled{opacity:.4;cursor:default}
+
+/* stage */
+.stage{position:relative;min-height:0;display:grid;place-items:center;padding:8px;background:var(--bg)}
+.board{position:relative;width:100%;height:100%;display:grid;place-items:center}
+svg.pitch{display:block;touch-action:none;user-select:none;-webkit-user-select:none;border-radius:10px;box-shadow:0 10px 40px -10px rgba(0,0,0,.6)}
+.note-view{position:absolute;left:12px;right:12px;bottom:12px;background:rgba(10,20,13,.82);border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;font-size:15px;line-height:1.5;white-space:pre-wrap;pointer-events:none;backdrop-filter:blur(4px)}
+.note-view:empty{display:none}
+
+/* tool bar */
+.tools{display:flex;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid var(--line);background:var(--panel);overflow-x:auto;scrollbar-width:none}
+.tools::-webkit-scrollbar{display:none}
+@media (min-width:900px){.tools{grid-column:1/2}}
+.tools .sep{width:1px;height:24px;background:var(--line);margin:0 4px;flex:none}
+.tbtn{height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font-weight:500;flex:none}
+.tbtn:hover{background:#28452f}
+.tbtn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;flex:none}
+.swatch.on{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+
+/* side panel */
+.side{border-left:1px solid var(--line);background:var(--panel);overflow:auto;min-height:0}
+@media (max-width:899px){
+  .side{position:fixed;inset:auto 0 0 0;max-height:70vh;border-left:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;transform:translateY(100%);transition:transform .22s;z-index:5;box-shadow:0 -10px 40px rgba(0,0,0,.5);padding-bottom:env(safe-area-inset-bottom,0)}
+  .side.open{transform:translateY(0)}
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:4}
+}
+@media (min-width:900px){.side{grid-row:2/4;grid-column:2/3}.scrim{display:none!important}}
+.side-h{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
+.side-h .tabs{display:flex;gap:4px;flex:1}
+.side-h .tabs button{flex:1;padding:7px 4px;border-radius:var(--r-s);border:1px solid var(--line);background:var(--panel-2);cursor:pointer;font-size:13px}
+.side-h .tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.pane{padding:12px}
+.pane h3{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.pane section{padding:0 0 14px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.pane section:last-child{border:0}
+.row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row label{color:var(--muted);font-size:13px;min-width:72px}
+.sel{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-s);padding:7px 8px}
+.btn{padding:8px 12px;border-radius:var(--r-s);border:1px solid var(--line);background:var(--panel-2);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{background:#28452f}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.btn.danger{color:#ffb4a8;border-color:#6b3028}
+.btn.sm{padding:5px 9px;font-size:12px}
+.toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px}
+.toggle input{accent-color:var(--accent);width:16px;height:16px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden;flex:1}
+.seg button{border:0;background:var(--panel-2);padding:7px 4px;cursor:pointer;font-size:13px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.roster{display:grid;gap:6px}
+.roster .p{display:grid;grid-template-columns:26px 44px 1fr 32px;align-items:center;gap:6px}
+.roster .p .dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:900;color:#fff}
+.roster .p input[type=text]{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-s);padding:5px 8px;min-width:0}
+.roster .p input.pos{text-transform:uppercase;text-align:center;font-weight:700;padding:5px 2px}
+.roster .p input[type=checkbox]{accent-color:var(--accent);width:18px;height:18px;justify-self:center}
+.scenes{display:grid;gap:6px}
+.scene{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--panel-2);cursor:pointer}
+.scene.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.scene b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scene .mini{color:var(--muted);font-size:11px;background:none;border:0;cursor:pointer;padding:2px 4px}
+.scene .mini:hover{color:var(--ink)}
+textarea.note{width:100%;min-height:80px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-s);padding:8px 10px;resize:vertical}
+.hint{color:var(--muted);font-size:12px;line-height:1.5;margin:6px 0 0}
+.toast{position:fixed;left:50%;bottom:calc(72px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(16px);background:#f4f6f4;color:#10200f;padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:9;max-width:calc(100% - 32px);text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* presentation */
+body.present .top,body.present .tools,body.present .side,body.present .scrim{display:none!important}
+body.present .app{grid-template-columns:1fr;grid-template-rows:1fr}
+body.present .stage{padding:0}
+body.present svg.pitch{border-radius:0;box-shadow:none}
+.present-ui{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:8px;right:8px;display:none;align-items:center;gap:8px;z-index:6;pointer-events:none}
+body.present .present-ui{display:flex}
+.present-ui>*{pointer-events:auto}
+.present-ui .title{flex:1;text-align:center;font-weight:900;font-size:18px;text-shadow:0 1px 4px rgba(0,0,0,.6);pointer-events:none}
+.present-ui .ibtn{background:rgba(10,20,13,.75);backdrop-filter:blur(4px)}
+@media (prefers-reduced-motion:reduce){.side{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>축구 작전판<small>11인제</small></h1>
+    <div class="scene-nav">
+      <button class="ibtn" id="prevScene" title="이전 상황">◀</button>
+      <input id="sceneName" aria-label="상황 이름" placeholder="상황 이름">
+      <button class="ibtn" id="nextScene" title="다음 상황">▶</button>
+      <span class="cnt" id="sceneCnt">1/1</span>
+    </div>
+    <button class="ibtn" id="presentBtn" title="발표 모드 (전체 화면)">⛶</button>
+    <button class="ibtn" id="panelBtn" title="설정 패널">☰</button>
+  </header>
+
+  <main class="stage">
+    <div class="board" id="board">
+      <svg class="pitch" id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="note-view" id="noteView"></div>
+    </div>
+  </main>
+
+  <nav class="tools" aria-label="도구">
+    <button class="tbtn on" data-tool="move">✥ 이동</button>
+    <button class="tbtn" data-tool="arrow">➜ 화살표</button>
+    <button class="tbtn" data-tool="line">✎ 자유선</button>
+    <button class="tbtn" data-tool="erase">⌫ 지우개</button>
+    <span class="sep"></span>
+    <span class="swatch on" data-color="#F2C94C" style="background:#F2C94C" title="노랑"></span>
+    <span class="swatch" data-color="#FFFFFF" style="background:#FFFFFF" title="흰색"></span>
+    <span class="swatch" data-color="#FF5252" style="background:#FF5252" title="빨강"></span>
+    <span class="swatch" data-color="#40C4FF" style="background:#40C4FF" title="파랑"></span>
+    <span class="sep"></span>
+    <button class="tbtn" id="undoBtn">↶ 되돌리기</button>
+    <button class="tbtn" id="clearDraw">선 모두 지우기</button>
+    <span class="sep"></span>
+    <button class="tbtn" id="addScene">＋ 상황 추가</button>
+    <button class="tbtn" id="pngBtn">⤓ 그림 저장</button>
+  </nav>
+
+  <aside class="side" id="side">
+    <div class="side-h">
+      <div class="tabs">
+        <button class="on" data-pane="setup">조건</button>
+        <button data-pane="players">선수</button>
+        <button data-pane="scenes">상황</button>
+        <button data-pane="file">저장</button>
+      </div>
+      <button class="ibtn" id="closeSide" title="닫기">✕</button>
+    </div>
+
+    <div class="pane" data-pane="setup">
+      <section>
+        <h3>우리 팀</h3>
+        <div class="row"><label for="ourForm">포메이션</label><select class="sel" id="ourForm"></select></div>
+        <div class="row"><label>유니폼 색</label>
+          <div class="seg" id="ourColor">
+            <button data-c="#E53935" style="color:#E53935">■ 빨강</button><button data-c="#F2C94C" style="color:#F2C94C">■ 노랑</button><button data-c="#FFFFFF" style="color:#fff">■ 흰색</button><button data-c="#111111" style="color:#ccc">■ 검정</button>
+          </div></div>
+        <div class="row"><label>공격 방향</label>
+          <div class="seg" id="dirSeg"><button data-d="1" class="on">오른쪽으로 →</button><button data-d="0">← 왼쪽으로</button></div></div>
+        <div class="row"><button class="btn" id="applyOur">우리 팀 배치 다시 놓기</button></div>
+      </section>
+      <section>
+        <h3>상대 팀</h3>
+        <div class="row"><label class="toggle"><input type="checkbox" id="showOpp" checked> 상대 선수 표시</label>
+          <label class="toggle"><input type="checkbox" id="showBall" checked> 공 표시</label></div>
+        <div class="row"><label for="oppForm">포메이션</label><select class="sel" id="oppForm"></select></div>
+        <div class="row"><label>유니폼 색</label>
+          <div class="seg" id="oppColor">
+            <button data-c="#1E88E5" style="color:#1E88E5">■ 파랑</button><button data-c="#FFFFFF" style="color:#fff">■ 흰색</button><button data-c="#8E24AA" style="color:#B069C7">■ 보라</button><button data-c="#111111" style="color:#ccc">■ 검정</button>
+          </div></div>
+        <div class="row"><button class="btn" id="applyOpp">상대 팀 배치 다시 놓기</button></div>
+      </section>
+      <section>
+        <h3>표시</h3>
+        <div class="row"><label class="toggle"><input type="checkbox" id="showNames" checked> 선수 이름 보이기</label>
+          <label class="toggle"><input type="checkbox" id="showPos" checked> 포지션 약어 보이기</label></div>
+        <p class="hint">선수 마커를 끌어서 옮깁니다. 이동 도구에서 마커를 한 번 톡 치면 이름을 바로 바꿀 수 있어요. 바뀐 배치는 현재 상황에 자동 저장됩니다.</p>
+      </section>
+    </div>
+
+    <div class="pane" data-pane="players" hidden>
+      <section>
+        <h3>우리 팀 선수 <span class="hint" style="display:inline">· 체크를 풀면 벤치(경기장에서 숨김)</span></h3>
+        <div class="roster" id="ourRoster"></div>
+      </section>
+      <section>
+        <h3>상대 팀</h3>
+        <div class="roster" id="oppRoster"></div>
+      </section>
+    </div>
+
+    <div class="pane" data-pane="scenes" hidden>
+      <section>
+        <h3>저장된 상황</h3>
+        <div class="scenes" id="sceneList"></div>
+        <div class="row">
+          <button class="btn primary" id="addScene2">＋ 현재 배치로 새 상황</button>
+          <button class="btn" id="dupScene">복제</button>
+          <button class="btn danger" id="delScene">삭제</button>
+        </div>
+        <p class="hint">공격 전개, 수비 블록, 코너킥 같은 장면을 따로 저장해 두고 ◀ ▶ 로 넘기며 설명하세요. 발표 모드(⛶)에서는 화면 양 끝을 탭하거나 ← → 키로 넘깁니다.</p>
+      </section>
+      <section>
+        <h3>이 상황의 설명</h3>
+        <textarea class="note" id="noteInput" placeholder="예) 상대 풀백이 올라오면 윙어가 뒷공간으로 뛴다. 중앙 미드필더는 공을 받으러 내려온다."></textarea>
+        <p class="hint">설명은 경기장 아래쪽에 겹쳐서 보입니다.</p>
+      </section>
+    </div>
+
+    <div class="pane" data-pane="file" hidden>
+      <section>
+        <h3>저장과 공유</h3>
+        <p class="hint" style="margin:0 0 8px">이 브라우저에는 자동 저장됩니다. 다른 기기로 옮기거나 백업하려면 파일로 저장하세요.</p>
+        <div class="row">
+          <button class="btn primary" id="exportJson">작전 전체를 파일로 저장</button>
+          <label class="btn" for="importJson">파일 불러오기</label>
+          <input type="file" id="importJson" accept="application/json,.json" hidden>
+        </div>
+        <div class="row"><button class="btn" id="pngBtn2">현재 상황을 그림(PNG)으로 저장</button></div>
+      </section>
+      <section>
+        <h3>초기화</h3>
+        <div class="row"><button class="btn danger" id="resetAll">모든 상황과 선수 이름 지우기</button></div>
+      </section>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+</div>
+
+<div class="present-ui">
+  <button class="ibtn" id="pPrev">◀</button>
+  <div class="title" id="pTitle"></div>
+  <button class="ibtn" id="pNext">▶</button>
+  <button class="ibtn" id="pExit" title="나가기">✕</button>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = (id) => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const STORE = "tactics-board-v1";
+
+/* ---------- formations: lines from GK; x = depth into own half (0 goal .. 0.5 center), y spread ---------- */
+const FORMS = {
+  "4-4-2":   [["GK"],["LB","CB","CB","RB"],["LM","CM","CM","RM"],["ST","ST"]],
+  "4-3-3":   [["GK"],["LB","CB","CB","RB"],["CM","CM","CM"],["LW","ST","RW"]],
+  "4-2-3-1": [["GK"],["LB","CB","CB","RB"],["DM","DM"],["LW","AM","RW"],["ST"]],
+  "4-1-4-1": [["GK"],["LB","CB","CB","RB"],["DM"],["LM","CM","CM","RM"],["ST"]],
+  "3-5-2":   [["GK"],["CB","CB","CB"],["LWB","CM","CM","CM","RWB"],["ST","ST"]],
+  "3-4-3":   [["GK"],["CB","CB","CB"],["LM","CM","CM","RM"],["LW","ST","RW"]],
+  "5-3-2":   [["GK"],["LWB","CB","CB","CB","RWB"],["CM","CM","CM"],["ST","ST"]],
+  "4-5-1":   [["GK"],["LB","CB","CB","RB"],["LM","CM","CM","CM","RM"],["ST"]],
+};
+const DEPTH = { 1: [0.06], 3: [0.06, 0.2, 0.4], 4: [0.06, 0.19, 0.32, 0.44], 5: [0.06, 0.18, 0.27, 0.36, 0.45] };
+function layout(form, mirror) {
+  const lines = FORMS[form], depth = DEPTH[lines.length];
+  const out = [];
+  lines.forEach((line, li) => {
+    const n = line.length, margin = n === 1 ? 0.5 : (n === 2 ? 0.34 : 0.12);
+    line.forEach((pos, i) => {
+      const y = n === 1 ? 0.5 : margin + (1 - 2 * margin) * i / (n - 1);
+      let x = depth[li];
+      if (mirror) x = 1 - x;
+      out.push({ pos, x, y });
+    });
+  });
+  return out;
+}
+
+/* ---------- state ---------- */
+const DEFAULT_NAMES = Array.from({ length: 11 }, (_, i) => "");
+function freshState() {
+  return {
+    ourForm: "4-4-2", oppForm: "4-4-2", attackRight: true,
+    ourColor: "#E53935", oppColor: "#1E88E5",
+    showOpp: true, showBall: true, showNames: true, showPos: true,
+    ourNames: DEFAULT_NAMES.slice(), oppNames: DEFAULT_NAMES.slice(),
+    ourActive: Array(11).fill(true), oppActive: Array(11).fill(true),
+    scenes: [], cur: 0,
+  };
+}
+let S = freshState();
+function makeScene(name, from) {
+  const our = from ? JSON.parse(JSON.stringify(from.our)) : layout(S.ourForm, !S.attackRight);
+  const opp = from ? JSON.parse(JSON.stringify(from.opp)) : layout(S.oppForm, S.attackRight);
+  return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, note: from ? from.note : "", our, opp,
+    ball: from ? { ...from.ball } : { x: 0.5, y: 0.5 }, draws: from ? JSON.parse(JSON.stringify(from.draws)) : [] };
+}
+function cur() { return S.scenes[S.cur]; }
+function load() {
+  try { const raw = localStorage.getItem(STORE); if (raw) { const o = JSON.parse(raw); if (o && Array.isArray(o.scenes) && o.scenes.length) S = Object.assign(freshState(), o); } } catch (_) {}
+  if (!S.scenes.length) {
+    S.scenes = [makeScene("기본 배치")];
+    S.cur = 0;
+  }
+  S.cur = Math.min(S.cur, S.scenes.length - 1);
+}
+let saveT;
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (_) {} }, 150); }
+
+/* ---------- geometry ---------- */
+const svg = $("svg"), board = $("board");
+let W = 800, H = 520, portrait = false, R = 18;
+function measure() {
+  const bw = board.clientWidth, bh = board.clientHeight;
+  portrait = bh > bw * 1.05;
+  const ratio = 105 / 68;
+  if (portrait) { W = Math.min(bw, bh / ratio); H = W * ratio; } else { W = Math.min(bw, bh * ratio); H = W / ratio; }
+  W = Math.floor(W); H = Math.floor(H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  R = Math.max(12, Math.min(W, H) * 0.034);
+}
+// normalized (x along length, y across width) -> pixels
+function px(p) { return portrait ? { x: p.y * W, y: (1 - p.x) * H } : { x: p.x * W, y: p.y * H }; }
+function norm(x, y) { return portrait ? { x: 1 - y / H, y: x / W } : { x: x / W, y: y / H }; }
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+/* ---------- render ---------- */
+const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
+function drawPitch(g) {
+  // pitch always drawn in a 105x68 model, then mapped
+  const L = (x, y) => px({ x, y });
+  const rect = (x0, y0, x1, y1, attrs) => { const a = L(x0, y0), b = L(x1, y1); el("rect", { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y), ...attrs }, g); };
+  el("rect", { x: 0, y: 0, width: W, height: H, fill: "#2E7D42" }, g);
+  // mowing stripes
+  for (let i = 0; i < 10; i++) if (i % 2) rect(i / 10, 0, (i + 1) / 10, 1, { fill: "#2A7340" });
+  const sw = Math.max(1.5, W / 420), chalk = { fill: "none", stroke: "#E8F3E8", "stroke-width": sw };
+  rect(0.03, 0.04, 0.97, 0.96, chalk);
+  const a = L(0.5, 0.04), b = L(0.5, 0.96); el("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, ...chalk }, g);
+  const c = L(0.5, 0.5); el("circle", { cx: c.x, cy: c.y, r: 0.0871 * (portrait ? H : W), ...chalk }, g);
+  el("circle", { cx: c.x, cy: c.y, r: sw * 1.5, fill: "#E8F3E8" }, g);
+  // boxes (16.5m / 5.5m) along both ends
+  const bx = 16.5 / 105 * 0.94, by = 40.3 / 68 * 0.92 / 2, gx = 5.5 / 105 * 0.94, gy = 18.3 / 68 * 0.92 / 2;
+  rect(0.03, 0.5 - by, 0.03 + bx, 0.5 + by, chalk); rect(0.97 - bx, 0.5 - by, 0.97, 0.5 + by, chalk);
+  rect(0.03, 0.5 - gy, 0.03 + gx, 0.5 + gy, chalk); rect(0.97 - gx, 0.5 - gy, 0.97, 0.5 + gy, chalk);
+  // goals
+  const goalW = 7.32 / 68 * 0.92 / 2, gd = 0.018;
+  rect(0.03 - gd, 0.5 - goalW, 0.03, 0.5 + goalW, { ...chalk, fill: "rgba(255,255,255,.18)" });
+  rect(0.97, 0.5 - goalW, 0.97 + gd, 0.5 + goalW, { ...chalk, fill: "rgba(255,255,255,.18)" });
+  // penalty spots + arcs
+  [[0.03 + 11 / 105 * 0.94, 1], [0.97 - 11 / 105 * 0.94, -1]].forEach(([x, dir]) => {
+    const p = L(x, 0.5); el("circle", { cx: p.x, cy: p.y, r: sw * 1.5, fill: "#E8F3E8" }, g);
+    const r = 0.0871 * (portrait ? H : W), bxp = L(dir > 0 ? 0.03 + bx : 0.97 - bx, 0.5);
+    const d = Math.abs(bxp.x - p.x) || Math.abs(bxp.y - p.y);
+    if (r > d) {
+      const h = Math.sqrt(r * r - d * d);
+      let p1, p2;
+      if (!portrait) { p1 = { x: bxp.x, y: p.y - h }; p2 = { x: bxp.x, y: p.y + h }; }
+      else { p1 = { x: p.x - h, y: bxp.y }; p2 = { x: p.x + h, y: bxp.y }; }
+      const sweep = (!portrait ? dir > 0 : dir < 0) ? 1 : 0;
+      el("path", { d: `M ${p1.x} ${p1.y} A ${r} ${r} 0 0 ${sweep} ${p2.x} ${p2.y}`, ...chalk }, g);
+    }
+  });
+}
+function arrowPath(pts) {
+  if (pts.length < 2) return "";
+  return "M " + pts.map((p) => { const q = px({ x: p[0], y: p[1] }); return `${q.x.toFixed(1)} ${q.y.toFixed(1)}`; }).join(" L ");
+}
+function render() {
+  measure();
+  svg.innerHTML = "";
+  const defs = el("defs", {}, svg);
+  ["#F2C94C", "#FFFFFF", "#FF5252", "#40C4FF"].forEach((c) => {
+    const m = el("marker", { id: "ah" + c.slice(1), viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 5, markerHeight: 5, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: c }, m);
+  });
+  drawPitch(el("g", { id: "gPitch" }, svg));
+  const sc = cur();
+  // drawings
+  const gd = el("g", { id: "gDraw" }, svg);
+  sc.draws.forEach((d, i) => {
+    const p = el("path", { d: arrowPath(d.pts), fill: "none", stroke: d.color, "stroke-width": Math.max(3, W / 180), "stroke-linecap": "round", "stroke-linejoin": "round", "data-i": i, opacity: .95 }, gd);
+    if (d.type === "arrow") p.setAttribute("marker-end", `url(#ah${d.color.slice(1)})`);
+    if (d.type === "line") p.setAttribute("stroke-dasharray", `${W / 90} ${W / 140}`);
+  });
+  el("path", { id: "liveDraw", d: "", fill: "none", "stroke-width": Math.max(3, W / 180), "stroke-linecap": "round", "stroke-linejoin": "round" }, svg);
+  // players
+  const gp = el("g", { id: "gPlayers" }, svg);
+  const drawTeam = (team, color, names, active) => {
+    sc[team].forEach((p, i) => {
+      if (!active[i]) return;
+      const q = px(p), g = el("g", { "data-team": team, "data-i": i, cursor: "grab" }, gp);
+      const ink = (color === "#FFFFFF" || color === "#F2C94C") ? "#111" : "#fff";
+      el("circle", { cx: q.x, cy: q.y, r: R, fill: color, stroke: team === "our" ? "#fff" : "#0b1b2b", "stroke-width": Math.max(1.5, R / 9) }, g);
+      if (S.showPos) el("text", { x: q.x, y: q.y, "text-anchor": "middle", "dominant-baseline": "central", "font-size": R * 0.78, "font-weight": 900, fill: ink, "font-family": "Noto Sans KR, sans-serif" }, g).textContent = p.pos;
+      const nm = names[i];
+      if (S.showNames && nm) el("text", { x: q.x, y: q.y + R * 1.75, "text-anchor": "middle", "font-size": Math.max(10, R * 0.72), "font-weight": 700, fill: "#fff", stroke: "rgba(0,0,0,.75)", "stroke-width": 3, "paint-order": "stroke", "font-family": "Noto Sans KR, sans-serif" }, g).textContent = nm;
+      el("circle", { cx: q.x, cy: q.y, r: R * 1.5, fill: "transparent" }, g); // touch target
+    });
+  };
+  if (S.showOpp) drawTeam("opp", S.oppColor, S.oppNames, S.oppActive);
+  drawTeam("our", S.ourColor, S.ourNames, S.ourActive);
+  if (S.showBall) {
+    const q = px(sc.ball), g = el("g", { "data-team": "ball", "data-i": 0, cursor: "grab" }, gp);
+    el("circle", { cx: q.x, cy: q.y, r: R * 0.55, fill: "#fff", stroke: "#222", "stroke-width": 2 }, g);
+    el("circle", { cx: q.x, cy: q.y, r: R * 0.22, fill: "#222" }, g);
+    el("circle", { cx: q.x, cy: q.y, r: R * 1.2, fill: "transparent" }, g);
+  }
+  // ui sync
+  $("sceneName").value = sc.name; $("sceneCnt").textContent = `${S.cur + 1}/${S.scenes.length}`;
+  $("prevScene").disabled = S.cur === 0; $("nextScene").disabled = S.cur === S.scenes.length - 1;
+  $("noteView").textContent = sc.note; $("noteInput").value = sc.note; $("pTitle").textContent = sc.name;
+  renderSceneList();
+}
+
+/* ---------- interaction ---------- */
+let tool = "move", color = "#F2C94C", drag = null;
+svg.addEventListener("pointerdown", (e) => {
+  const pt = svgPoint(e);
+  if (tool === "move") {
+    const g = e.target.closest("g[data-team]"); if (!g) return;
+    const team = g.dataset.team, i = +g.dataset.i;
+    drag = { team, i, moved: false, start: pt, t0: Date.now() };
+    svg.setPointerCapture(e.pointerId); e.preventDefault();
+  } else if (tool === "erase") {
+    const p = e.target.closest("path[data-i]"); if (!p) return;
+    cur().draws.splice(+p.dataset.i, 1); save(); render();
+  } else {
+    const n = norm(pt.x, pt.y);
+    drag = { draw: { type: tool, color, pts: [[clamp01(n.x), clamp01(n.y)]] } };
+    svg.setPointerCapture(e.pointerId); e.preventDefault();
+  }
+});
+svg.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const pt = svgPoint(e), n = norm(pt.x, pt.y);
+  if (drag.draw) {
+    const d = drag.draw, last = d.pts[d.pts.length - 1];
+    if (d.type === "arrow") { d.pts = [d.pts[0], [clamp01(n.x), clamp01(n.y)]]; }
+    else if (Math.hypot(n.x - last[0], n.y - last[1]) > 0.008) d.pts.push([clamp01(n.x), clamp01(n.y)]);
+    const live = $("liveDraw"); live.setAttribute("d", arrowPath(d.pts)); live.setAttribute("stroke", d.color);
+    if (d.type === "arrow") live.setAttribute("marker-end", `url(#ah${d.color.slice(1)})`); else live.setAttribute("stroke-dasharray", `${W / 90} ${W / 140}`);
+    return;
+  }
+  if (Math.hypot(pt.x - drag.start.x, pt.y - drag.start.y) > 4) drag.moved = true;
+  if (!drag.moved) return;
+  const target = drag.team === "ball" ? cur().ball : cur()[drag.team][drag.i];
+  target.x = clamp01(n.x); target.y = clamp01(n.y);
+  // move only the group for smoothness
+  const q = px(target), g = svg.querySelector(`g[data-team="${drag.team}"][data-i="${drag.i}"]`);
+  if (g) g.querySelectorAll("circle,text").forEach((c) => { if (c.tagName === "circle") { c.setAttribute("cx", q.x); c.setAttribute("cy", q.y); } else { c.setAttribute("x", q.x); c.setAttribute("y", c.getAttribute("y") && c.textContent !== target.pos ? q.y + R * 1.75 : q.y); } });
+});
+const endDrag = (e) => {
+  if (!drag) return;
+  if (drag.draw) { if (drag.draw.pts.length > 1) cur().draws.push(drag.draw); $("liveDraw").setAttribute("d", ""); save(); render(); }
+  else if (!drag.moved && drag.team !== "ball" && Date.now() - drag.t0 < 600) { editName(drag.team, drag.i); }
+  else if (drag.moved) { save(); render(); }
+  drag = null;
+};
+svg.addEventListener("pointerup", endDrag); svg.addEventListener("pointercancel", endDrag);
+function svgPoint(e) { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) }; }
+function editName(team, i) {
+  const arr = team === "our" ? S.ourNames : S.oppNames;
+  const v = prompt(`${cur()[team][i].pos} 선수 이름`, arr[i] || "");
+  if (v === null) return; arr[i] = v.trim(); save(); render(); renderRosters();
+}
+
+/* tools */
+document.querySelectorAll(".tbtn[data-tool]").forEach((b) => b.addEventListener("click", () => {
+  tool = b.dataset.tool; document.querySelectorAll(".tbtn[data-tool]").forEach((x) => x.classList.toggle("on", x === b));
+  svg.style.cursor = tool === "move" ? "default" : tool === "erase" ? "not-allowed" : "crosshair";
+}));
+document.querySelectorAll(".swatch").forEach((s) => s.addEventListener("click", () => {
+  color = s.dataset.color; document.querySelectorAll(".swatch").forEach((x) => x.classList.toggle("on", x === s));
+  if (tool === "move" || tool === "erase") document.querySelector('.tbtn[data-tool="arrow"]').click();
+}));
+$("undoBtn").addEventListener("click", () => { cur().draws.pop(); save(); render(); });
+$("clearDraw").addEventListener("click", () => { cur().draws = []; save(); render(); });
+
+/* scenes */
+function addScene() { const sc = makeScene(`상황 ${S.scenes.length + 1}`, cur()); sc.draws = []; sc.note = ""; S.scenes.splice(S.cur + 1, 0, sc); S.cur++; save(); render(); openPane("scenes"); toast("새 상황을 추가했어요. 이름을 바꿔 보세요"); }
+$("addScene").addEventListener("click", addScene); $("addScene2").addEventListener("click", addScene);
+$("dupScene").addEventListener("click", () => { const sc = makeScene(cur().name + " 복사", cur()); S.scenes.splice(S.cur + 1, 0, sc); S.cur++; save(); render(); });
+$("delScene").addEventListener("click", () => { if (S.scenes.length === 1) { toast("마지막 상황은 지울 수 없어요"); return; } if (!confirm(`"${cur().name}" 상황을 삭제할까요?`)) return; S.scenes.splice(S.cur, 1); S.cur = Math.max(0, S.cur - 1); save(); render(); });
+const go = (d) => { const n = S.cur + d; if (n < 0 || n >= S.scenes.length) return; S.cur = n; save(); render(); };
+$("prevScene").addEventListener("click", () => go(-1)); $("nextScene").addEventListener("click", () => go(1));
+$("pPrev").addEventListener("click", () => go(-1)); $("pNext").addEventListener("click", () => go(1));
+$("sceneName").addEventListener("input", (e) => { cur().name = e.target.value; save(); renderSceneList(); $("pTitle").textContent = cur().name; });
+$("noteInput").addEventListener("input", (e) => { cur().note = e.target.value; $("noteView").textContent = e.target.value; save(); });
+function renderSceneList() {
+  const list = $("sceneList"); list.innerHTML = "";
+  S.scenes.forEach((sc, i) => {
+    const d = document.createElement("div"); d.className = "scene" + (i === S.cur ? " on" : "");
+    d.innerHTML = `<b>${i + 1}. ${esc(sc.name)}</b><button class="mini" data-up title="위로">▲</button><button class="mini" data-down title="아래로">▼</button>`;
+    d.addEventListener("click", (e) => {
+      if (e.target.hasAttribute("data-up") && i > 0) { [S.scenes[i - 1], S.scenes[i]] = [S.scenes[i], S.scenes[i - 1]]; S.cur = i - 1; }
+      else if (e.target.hasAttribute("data-down") && i < S.scenes.length - 1) { [S.scenes[i + 1], S.scenes[i]] = [S.scenes[i], S.scenes[i + 1]]; S.cur = i + 1; }
+      else S.cur = i;
+      save(); render();
+    });
+    list.appendChild(d);
+  });
+}
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* setup pane */
+const fillForms = (sel, val) => { sel.innerHTML = Object.keys(FORMS).map((f) => `<option value="${f}"${f === val ? " selected" : ""}>${f}</option>`).join(""); };
+function syncSetup() {
+  fillForms($("ourForm"), S.ourForm); fillForms($("oppForm"), S.oppForm);
+  $("showOpp").checked = S.showOpp; $("showBall").checked = S.showBall; $("showNames").checked = S.showNames; $("showPos").checked = S.showPos;
+  pressSeg($("ourColor"), "c", S.ourColor); pressSeg($("oppColor"), "c", S.oppColor); pressSeg($("dirSeg"), "d", S.attackRight ? "1" : "0");
+}
+function pressSeg(seg, key, val) { seg.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset[key] === val)); }
+$("ourForm").addEventListener("change", (e) => { S.ourForm = e.target.value; cur().our = layout(S.ourForm, !S.attackRight); save(); render(); renderRosters(); });
+$("oppForm").addEventListener("change", (e) => { S.oppForm = e.target.value; cur().opp = layout(S.oppForm, S.attackRight); save(); render(); renderRosters(); });
+$("applyOur").addEventListener("click", () => { cur().our = layout(S.ourForm, !S.attackRight); save(); render(); });
+$("applyOpp").addEventListener("click", () => { cur().opp = layout(S.oppForm, S.attackRight); save(); render(); });
+$("ourColor").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S.ourColor = b.dataset.c; syncSetup(); save(); render(); renderRosters(); });
+$("oppColor").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S.oppColor = b.dataset.c; syncSetup(); save(); render(); renderRosters(); });
+$("dirSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const want = b.dataset.d === "1"; if (want === S.attackRight) return;
+  S.attackRight = want;
+  // mirror everything in every scene so the plan stays intact
+  S.scenes.forEach((sc) => { sc.our.forEach((p) => p.x = 1 - p.x); sc.opp.forEach((p) => p.x = 1 - p.x); sc.ball.x = 1 - sc.ball.x; sc.draws.forEach((d) => d.pts.forEach((q) => q[0] = 1 - q[0])); });
+  syncSetup(); save(); render();
+});
+["showOpp", "showBall", "showNames", "showPos"].forEach((id) => $(id).addEventListener("change", (e) => { S[id] = e.target.checked; save(); render(); }));
+
+/* roster pane */
+function renderRosters() {
+  const build = (team, host, color, names, active) => {
+    host.innerHTML = "";
+    cur()[team].forEach((p, i) => {
+      const row = document.createElement("div"); row.className = "p";
+      const ink = (color === "#FFFFFF" || color === "#F2C94C") ? "#111" : "#fff";
+      row.innerHTML = `<span class="dot" style="background:${color};color:${ink}">${i + 1}</span><input type="text" class="pos" value="${esc(p.pos)}" maxlength="3" aria-label="포지션"><input type="text" value="${esc(names[i])}" placeholder="이름" aria-label="이름"><input type="checkbox" ${active[i] ? "checked" : ""} aria-label="출전">`;
+      const [posIn, nameIn, chk] = row.querySelectorAll("input");
+      posIn.addEventListener("input", () => { const v = posIn.value.toUpperCase(); S.scenes.forEach((sc) => { if (sc[team][i]) sc[team][i].pos = v; }); save(); render(); });
+      nameIn.addEventListener("input", () => { names[i] = nameIn.value; save(); render(); });
+      chk.addEventListener("change", () => { active[i] = chk.checked; save(); render(); });
+      host.appendChild(row);
+    });
+  };
+  build("our", $("ourRoster"), S.ourColor, S.ourNames, S.ourActive);
+  build("opp", $("oppRoster"), S.oppColor, S.oppNames, S.oppActive);
+}
+
+/* side panel */
+const side = $("side"), scrim = $("scrim");
+function openPane(name) {
+  document.querySelectorAll(".side-h .tabs button").forEach((b) => b.classList.toggle("on", b.dataset.pane === name));
+  document.querySelectorAll(".pane").forEach((p) => p.hidden = p.dataset.pane !== name);
+  if (window.innerWidth < 900) { side.classList.add("open"); scrim.hidden = false; }
+}
+document.querySelectorAll(".side-h .tabs button").forEach((b) => b.addEventListener("click", () => openPane(b.dataset.pane)));
+const closeSide = () => { side.classList.remove("open"); scrim.hidden = true; };
+$("closeSide").addEventListener("click", closeSide); scrim.addEventListener("click", closeSide);
+$("panelBtn").addEventListener("click", () => { if (side.classList.contains("open")) closeSide(); else openPane(document.querySelector(".side-h .tabs button.on").dataset.pane); });
+
+/* presentation */
+function present(on) {
+  document.body.classList.toggle("present", on);
+  if (on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  closeSide(); setTimeout(render, 60);
+}
+$("presentBtn").addEventListener("click", () => present(true)); $("pExit").addEventListener("click", () => present(false));
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("present")) present(false); });
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input,textarea")) return;
+  if (e.key === "ArrowRight") go(1); else if (e.key === "ArrowLeft") go(-1);
+  else if (e.key === "Escape") present(false);
+  else if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); $("undoBtn").click(); }
+});
+// tap edges in presentation mode to switch
+svg.addEventListener("click", (e) => {
+  if (!document.body.classList.contains("present") || tool !== "move") return;
+  const r = svg.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width;
+  if (e.target.closest("g[data-team]")) return;
+  if (fx < 0.12) go(-1); else if (fx > 0.88) go(1);
+});
+
+/* export / import */
+function download(name, blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+async function exportPng() {
+  const clone = svg.cloneNode(true); clone.querySelector("#liveDraw")?.remove();
+  const scale = 2, cw = W * scale, ch = H * scale + (cur().note ? 64 * scale : 0);
+  const xml = new XMLSerializer().serializeToString(clone);
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas"); c.width = cw; c.height = ch; const x = c.getContext("2d");
+    x.fillStyle = "#0F1A13"; x.fillRect(0, 0, cw, ch); x.drawImage(img, 0, 0, W * scale, H * scale);
+    if (cur().note) { x.fillStyle = "#EEF3EE"; x.font = `${18 * scale}px "Noto Sans KR", sans-serif`; x.textBaseline = "middle"; x.fillText(cur().note.split("\n")[0].slice(0, 70), 16 * scale, H * scale + 32 * scale); }
+    x.fillStyle = "rgba(255,255,255,.55)"; x.font = `${12 * scale}px "Noto Sans KR", sans-serif`; x.textAlign = "right"; x.fillText(cur().name, cw - 12 * scale, 16 * scale);
+    c.toBlob((b) => { download(`작전판_${cur().name.replace(/[\\/:*?"<>|]/g, "_")}.png`, b); toast("그림으로 저장했어요"); }, "image/png");
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+}
+$("pngBtn").addEventListener("click", exportPng); $("pngBtn2").addEventListener("click", exportPng);
+$("exportJson").addEventListener("click", () => { download(`축구작전판_${new Date().toISOString().slice(0, 10)}.json`, new Blob([JSON.stringify(S, null, 1)], { type: "application/json" })); toast("파일로 저장했어요"); });
+$("importJson").addEventListener("change", (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then((t) => { const o = JSON.parse(t); if (!o || !Array.isArray(o.scenes)) throw 0; S = Object.assign(freshState(), o); S.cur = 0; save(); syncSetup(); render(); renderRosters(); toast("불러왔어요"); }).catch(() => toast("작전판 파일이 아니에요")); e.target.value = "";
+});
+$("resetAll").addEventListener("click", () => { if (!confirm("모든 상황과 선수 이름을 지우고 처음 상태로 돌릴까요?")) return; S = freshState(); S.scenes = [makeScene("기본 배치")]; save(); syncSetup(); render(); renderRosters(); });
+
+let toastT; function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2200); }
+
+/* boot */
+load(); syncSetup(); render(); renderRosters();
+new ResizeObserver(() => render()).observe(board);
+try { if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js"); } catch (_) {}
+})();
+</script>
+</body>
+</html>
