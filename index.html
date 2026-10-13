@@ -28,16 +28,17 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font
 button,input,select,textarea{font:inherit;color:inherit}
 [hidden]{display:none!important}
 
-.app{display:grid;grid-template-rows:auto 1fr auto;height:100%;max-width:1400px;margin:0 auto;padding:0 env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+.app{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr auto;min-width:0;height:100%;max-width:1400px;margin:0 auto;padding:0 env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
 @media (min-width:900px){.app{grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:auto 1fr auto}}
 
 /* top bar */
-.top{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+.top{display:flex;align-items:center;gap:8px;padding:10px 12px;min-width:0;overflow:hidden;border-bottom:1px solid var(--line);background:var(--panel)}
 @media (min-width:900px){.top{grid-column:1/3}}
+@media (max-width:600px){.top{gap:6px;padding:8px 10px}.top h1{font-size:14px}.top h1 small,.scene-nav .cnt{display:none}.scene-nav input{padding:6px 6px;font-size:13px}}
 .top h1{margin:0;font-size:16px;font-weight:900;letter-spacing:-.01em;white-space:nowrap}
 .top h1 small{font-weight:500;color:var(--muted);font-size:12px;margin-left:6px}
 .scene-nav{display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center}
-.scene-nav input{flex:1;min-width:0;max-width:260px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-s);padding:6px 10px;font-weight:700;text-align:center}
+.scene-nav input{flex:1;min-width:0;width:100%;max-width:260px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-s);padding:6px 10px;font-weight:700;text-align:center}
 .scene-nav .cnt{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ibtn{width:34px;height:34px;border-radius:var(--r-s);border:1px solid var(--line);background:var(--panel-2);display:inline-grid;place-items:center;cursor:pointer;flex:none;font-size:16px;line-height:1}
 .ibtn:hover{background:#28452f}
